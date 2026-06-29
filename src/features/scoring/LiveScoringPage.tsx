@@ -24,6 +24,9 @@ import { SmartPlayEditor } from './SmartPlayEditor';
 
 type EditForm = {
   description: string;
+  quarter: string;
+  clockStartSeconds: number;
+  clockEndSeconds: number;
   yards: number;
   returnYards: number;
   touchdown: boolean;
@@ -177,6 +180,9 @@ export function LiveScoringPage() {
     setEditingEventId(item.eventId);
     setEditForm({
       description: item.description,
+      quarter: item.play.quarter ?? item.before.clock.quarter,
+      clockStartSeconds: Number(item.play.clockStartSeconds ?? item.before.clock.secondsRemaining),
+      clockEndSeconds: Number(item.play.clockEndSeconds ?? item.after.clock.secondsRemaining),
       yards: Number(item.play.yards ?? 0),
       returnYards: Number(item.play.returnYards ?? 0),
       touchdown: item.play.touchdown === true,
@@ -197,6 +203,9 @@ export function LiveScoringPage() {
     try {
       const updatedPlay: PlayInput = {
         ...sourceEvent.play,
+        quarter: editForm.quarter,
+        clockStartSeconds: Number(editForm.clockStartSeconds),
+        clockEndSeconds: Number(editForm.clockEndSeconds),
         yards: Number(editForm.yards),
         returnYards: Number(editForm.returnYards),
         touchdown: editForm.touchdown,
@@ -309,7 +318,15 @@ export function LiveScoringPage() {
               Für dieses Spiel wurden keine Spieler gefunden. Bitte in der Teamverwaltung Spieler zu beiden Teams hinzufügen.
             </div>
           ) : (
-            <SmartPlayEditor state={state} players={players} onApply={handleApply} />
+            <SmartPlayEditor
+              state={state}
+              players={players}
+              teamOptions={[
+                ...(homeTeam ? [{ id: homeTeam.id, label: `${homeTeam.abbr} - ${homeTeam.name}` }] : []),
+                ...(awayTeam ? [{ id: awayTeam.id, label: `${awayTeam.abbr} - ${awayTeam.name}` }] : []),
+              ]}
+              onApply={handleApply}
+            />
           )}
 
           <div className="grid grid-cols-[1fr_420px] gap-6">
@@ -492,6 +509,7 @@ function TimelineDetails({
         <div className="space-y-4">
           <Detail label="Situation vorher" value={`Q${item.before.clock.quarter} ${formatClock(item.before.clock.secondsRemaining)} · ${item.before.down} & ${item.before.distance} @ ${teamYardline(item.before.absoluteYardline, item.before.possessionTeamId, item.before.defenseTeamId, homeTeam, awayTeam)}`} />
           <Detail label="Beschreibung" value={item.description} />
+          <Detail label="Event Clock" value={`Q${item.play.quarter ?? item.before.clock.quarter} ${formatClock(Number(item.play.clockStartSeconds ?? item.before.clock.secondsRemaining))} → ${formatClock(Number(item.play.clockEndSeconds ?? item.after.clock.secondsRemaining))}`} />
           <Detail label="Yards" value={String(item.play.yards ?? 0)} />
           <Detail label="Return Yards" value={String(item.play.returnYards ?? 0)} />
           <Detail label="Situation danach" value={`Q${item.after.clock.quarter} ${formatClock(item.after.clock.secondsRemaining)} · ${item.after.down} & ${item.after.distance} @ ${teamYardline(item.after.absoluteYardline, item.after.possessionTeamId, item.after.defenseTeamId, homeTeam, awayTeam)}`} />
@@ -515,6 +533,27 @@ function TimelineDetails({
               onChange={(event) => setEditForm({ ...editForm, description: event.target.value })}
             />
           </label>
+
+          <div className="grid grid-cols-3 gap-3">
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Quarter</span>
+              <select className="input" value={editForm.quarter} onChange={(event) => setEditForm({ ...editForm, quarter: event.target.value })}>
+                <option value="1">Q1</option>
+                <option value="2">Q2</option>
+                <option value="3">Q3</option>
+                <option value="4">Q4</option>
+                <option value="OT">OT</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Clock Start</span>
+              <input className="input" value={formatClock(editForm.clockStartSeconds)} onChange={(event) => setEditForm({ ...editForm, clockStartSeconds: parseClock(event.target.value) })} />
+            </label>
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Clock End</span>
+              <input className="input" value={formatClock(editForm.clockEndSeconds)} onChange={(event) => setEditForm({ ...editForm, clockEndSeconds: parseClock(event.target.value) })} />
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -646,8 +685,21 @@ function teamYardline(absoluteYardline: number, possessionTeamId: string, defens
   return yardlineLabel(absoluteYardline, offenseAbbr ?? 'OWN', defenseAbbr ?? 'OPP');
 }
 
+function parseClock(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  if (/^\d+$/.test(trimmed)) return Math.max(0, Number(trimmed));
+
+  const [minutesRaw, secondsRaw = '0'] = trimmed.split(':');
+  const minutes = Number(minutesRaw);
+  const seconds = Number(secondsRaw);
+  if (Number.isNaN(minutes) || Number.isNaN(seconds)) return 0;
+  return Math.max(0, minutes * 60 + seconds);
+}
+
 function formatClock(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+  const safe = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }

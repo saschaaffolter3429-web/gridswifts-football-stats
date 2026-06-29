@@ -54,6 +54,10 @@ export function applyPlay(state: GameState, play: PlayInput): PlayResult {
   next.playIndex += 1;
   next.messages = [];
 
+  if (play.quarter !== undefined && play.quarter !== '') {
+    next.clock.quarter = play.quarter;
+  }
+
   if (play.clockEndSeconds !== undefined) {
     next.clock.secondsRemaining = play.clockEndSeconds;
   }
@@ -175,16 +179,18 @@ export function applyPlay(state: GameState, play: PlayInput): PlayResult {
       const returnYards = play.returnYards ?? 0;
       const landingSpot = clampYardline(kickYards);
       const receivingSpot = clampYardline(ruleSet.fieldLength - landingSpot + returnYards);
+      const kickingTeamId = play.kickingTeamId ?? state.possessionTeamId;
+      const receivingTeamId = play.receivingTeamId ?? state.defenseTeamId;
 
       if (play.onsideKick && play.kickingTeamRecovered) {
-        changePossession(next, state.possessionTeamId, clampYardline(state.absoluteYardline + 10));
+        changePossession(next, kickingTeamId, clampYardline((play.kickoffStartYardline ?? state.absoluteYardline) + 10));
         resetSeries(next);
         next.messages.push('Onside kick recovered by kicking team.');
       } else if (play.touchback) {
-        changePossession(next, state.defenseTeamId, ruleSet.touchbackYardline);
+        changePossession(next, receivingTeamId, ruleSet.touchbackYardline);
         resetSeries(next);
       } else {
-        changePossession(next, state.defenseTeamId, receivingSpot);
+        changePossession(next, receivingTeamId, receivingSpot);
         resetSeries(next);
       }
       break;

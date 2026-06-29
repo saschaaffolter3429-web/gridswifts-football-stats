@@ -7,9 +7,15 @@ import { playersForRole } from '../../lib/play-editor/playerResolver';
 import { hasBlockingErrors, validateSmartPlay } from '../../lib/play-editor/footballIQ';
 import type { EditorPlayer, PlayFieldDefinition, SmartPlayValues } from '../../lib/play-editor/playEditorTypes';
 
+type TeamOption = {
+  id: string;
+  label: string;
+};
+
 type Props = {
   state: GameState;
   players: EditorPlayer[];
+  teamOptions?: TeamOption[];
   onApply: (nextState: GameState, play: PlayInput, description: string) => void | Promise<void>;
 };
 
@@ -23,10 +29,17 @@ const fieldGroups = [
   ['penalty', 'Penalty'],
 ] as const;
 
-export function SmartPlayEditor({ state, players, onApply }: Props) {
+export function SmartPlayEditor({ state, players, teamOptions = [], onApply }: Props) {
   const categories = useMemo(() => registryByCategory(), []);
   const [selectedKind, setSelectedKind] = useState<PlayKind>('RUSH');
   const definition = getPlayTypeDefinition(selectedKind);
+  const [quarter, setQuarter] = useState(state.clock.quarter);
+  const [clockStartText, setClockStartText] = useState(formatClock(state.clock.secondsRemaining));
+  const [clockEndText, setClockEndText] = useState(formatClock(state.clock.secondsRemaining));
+  const [kickoffStartYardline, setKickoffStartYardline] = useState(35);
+  const [kickingTeamId, setKickingTeamId] = useState(state.possessionTeamId);
+  const [receivingTeamId, setReceivingTeamId] = useState(state.defenseTeamId);
+
   const context = {
     gameId: state.gameId,
     offenseTeamId: state.possessionTeamId,
@@ -34,16 +47,26 @@ export function SmartPlayEditor({ state, players, onApply }: Props) {
     absoluteYardline: state.absoluteYardline,
     down: state.down,
     distance: state.distance,
-    clockStartSeconds: state.clock.secondsRemaining,
+    quarter,
+    clockStartSeconds: parseClock(clockStartText),
+    clockEndSeconds: parseClock(clockEndText),
   };
 
   const [values, setValues] = useState<SmartPlayValues>(() => defaultValuesForPlay(definition, context));
   const [submitMessage, setSubmitMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const playPreview = buildPlayInputFromDefinition(definition, values, context);
+  const playPreview = enrichPlayWithGameContext(buildPlayInputFromDefinition(definition, values, context));
   const iqWarnings = validateSmartPlay({ state, definition, values, play: playPreview });
   const activeTemplates = templatesForKind(definition.kind);
+
+  useEffect(() => {
+    setQuarter(state.clock.quarter);
+    setClockStartText(formatClock(state.clock.secondsRemaining));
+    setClockEndText(formatClock(state.clock.secondsRemaining));
+    setKickingTeamId(state.possessionTeamId);
+    setReceivingTeamId(state.defenseTeamId);
+  }, [state.clock.quarter, state.clock.secondsRemaining, state.possessionTeamId, state.defenseTeamId]);
 
   // Wenn sich die Spielsituation ändert, werden berechnete Felder wie FG-Distanz neu aufgebaut.
   // Der ausgewählte Play-Type bleibt aber bestehen.
@@ -104,10 +127,26 @@ export function SmartPlayEditor({ state, players, onApply }: Props) {
     setSubmitMessage('');
   }
 
+  function enrichPlayWithGameContext(play: PlayInput): PlayInput {
+    return {
+      ...play,
+      quarter,
+      clockStartSeconds: parseClock(clockStartText),
+      clockEndSeconds: parseClock(clockEndText),
+      ...(play.kind === 'KICKOFF'
+        ? {
+            kickingTeamId,
+            receivingTeamId,
+            kickoffStartYardline,
+          }
+        : {}),
+    };
+  }
+
   async function submit() {
     if (isSubmitting) return;
 
-    const play = buildPlayInputFromDefinition(definition, values, context);
+    const play = enrichPlayWithGameContext(buildPlayInputFromDefinition(definition, values, context));
     const warnings = validateSmartPlay({ state, definition, values, play });
 
     if (hasBlockingErrors(warnings)) {
@@ -181,6 +220,72 @@ export function SmartPlayEditor({ state, players, onApply }: Props) {
       </aside>
 
       <section className="space-y-6 h-[calc(100vh-7rem)] overflow-auto pr-2">
+        <div className="rounded-3xl border border-gs-line bg-gs-card p-5">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-lg font-black">Game Context</h3>
+              <p className="text-xs text-zinc-400">Diese Angaben werden mit jedem Play im Event Store gespeichert.</p>
+            </div>
+            <div className="text-xs text-zinc-500 uppercase tracking-[0.2em]">Milestone 2.1.5 A</div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-4">
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Quarter</span>
+              <select className="input" value={quarter} onChange={(event) => setQuarter(event.target.value)}>
+                <option value="1">Q1</option>
+                <option value="2">Q2</option>
+                <option value="3">Q3</option>
+                <option value="4">Q4</option>
+                <option value="OT">OT</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Clock Start</span>
+              <input className="input" value={clockStartText} onChange={(event) => setClockStartText(event.target.value)} placeholder="12:00" />
+            </label>
+
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Clock End</span>
+              <input className="input" value={clockEndText} onChange={(event) => setClockEndText(event.target.value)} placeholder="11:42" />
+            </label>
+
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Possession</span>
+              <input className="input opacity-70" disabled value={state.possessionTeamId} />
+            </label>
+
+            <label className="block">
+              <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Defense</span>
+              <input className="input opacity-70" disabled value={state.defenseTeamId} />
+            </label>
+          </div>
+
+          {definition.kind === 'KICKOFF' && (
+            <div className="grid grid-cols-3 gap-4 mt-4 rounded-2xl border border-gs-line bg-black/30 p-4">
+              <label className="block">
+                <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Kicking Team</span>
+                <select className="input" value={kickingTeamId} onChange={(event) => setKickingTeamId(event.target.value)}>
+                  {teamOptions.map((team) => <option key={team.id} value={team.id}>{team.label}</option>)}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Receiving Team</span>
+                <select className="input" value={receivingTeamId} onChange={(event) => setReceivingTeamId(event.target.value)}>
+                  {teamOptions.map((team) => <option key={team.id} value={team.id}>{team.label}</option>)}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">Kickoff Start</span>
+                <input className="input" type="number" value={kickoffStartYardline} onChange={(event) => setKickoffStartYardline(Number(event.target.value))} />
+              </label>
+            </div>
+          )}
+        </div>
+
         <div className="rounded-3xl border border-gs-line bg-black overflow-hidden">
           <div className="bg-[#151517] px-6 py-4 flex items-center justify-between">
             <div>
@@ -397,4 +502,28 @@ function FieldWrap({ field, children }: { field: PlayFieldDefinition; children: 
       {field.help && <div className="text-xs text-zinc-500 mt-1">{field.help}</div>}
     </label>
   );
+}
+
+
+function parseClock(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+
+  if (/^\d+$/.test(trimmed)) {
+    return Math.max(0, Number(trimmed));
+  }
+
+  const [minutesRaw, secondsRaw = '0'] = trimmed.split(':');
+  const minutes = Number(minutesRaw);
+  const seconds = Number(secondsRaw);
+
+  if (Number.isNaN(minutes) || Number.isNaN(seconds)) return 0;
+  return Math.max(0, minutes * 60 + seconds);
+}
+
+function formatClock(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safe / 60);
+  const rest = safe % 60;
+  return `${minutes}:${rest.toString().padStart(2, '0')}`;
 }

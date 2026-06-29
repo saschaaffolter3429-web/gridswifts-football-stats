@@ -86,7 +86,9 @@ export type SmartPlayContext = {
   absoluteYardline: number;
   down: number;
   distance: number;
+  quarter: string;
   clockStartSeconds: number;
+  clockEndSeconds?: number;
 };
 
 export type FootballIQWarning = {

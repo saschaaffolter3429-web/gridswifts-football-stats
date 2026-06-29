@@ -106,6 +106,7 @@ export type Penalty = {
 export type PlayInput = {
   id: string;
   kind: PlayKind;
+  quarter?: string;
   clockStartSeconds?: number;
   clockEndSeconds?: number;
   yards?: number;
@@ -124,6 +125,9 @@ export type PlayInput = {
   fairCatch?: boolean;
   onsideKick?: boolean;
   kickingTeamRecovered?: boolean;
+  kickingTeamId?: TeamId;
+  receivingTeamId?: TeamId;
+  kickoffStartYardline?: number;
   offenseRecoveredFumble?: boolean;
   players?: PlayerRefs;
   penalty?: Penalty;
