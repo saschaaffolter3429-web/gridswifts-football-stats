@@ -26,7 +26,7 @@ export function Shell({
       <div className="grid grid-cols-[260px_1fr] min-h-screen">
         <aside className="border-r border-gs-line bg-[#0b0b0c] p-6">
           <h1 className="text-3xl font-black">GridSwifts</h1>
-          <p className="text-gs-soft text-xs tracking-[0.3em] uppercase mt-1">Football Stats 2.1.0</p>
+          <p className="text-gs-soft text-xs tracking-[0.3em] uppercase mt-1">Football Stats 2.1.3</p>
 
           <nav className="mt-10 space-y-2">
             {nav.map((item) => (
@@ -50,9 +50,9 @@ export function Shell({
           <header className="h-16 border-b border-gs-line bg-[#111113] flex items-center justify-between px-6">
             <div>
               <h2 className="font-bold text-lg">Game Operations Center</h2>
-              <p className="text-xs text-zinc-400">Football Engine Foundation: GameState → Play → New GameState</p>
+              <p className="text-xs text-zinc-400">Smart Play Engine: Templates, Football IQ, Event Store</p>
             </div>
-            <div className="rounded-full bg-gs-orange text-black px-4 py-2 font-bold">v2.1.0 Engine</div>
+            <div className="rounded-full bg-gs-orange text-black px-4 py-2 font-bold">v2.1.3 Smart Engine</div>
           </header>
 
           <div className="p-6">{children}</div>

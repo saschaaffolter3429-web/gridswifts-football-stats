@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.3
+
+- Added Smart Play Templates.
+- Added keyboard shortcuts for play type selection.
+- Added Ctrl+Enter submit shortcut.
+- Added Football IQ v2 validations.
+- Added template documentation and sprint checklist.
+
+
 ## 2.1.2 Event Store Foundation
 
 - Added persistent game event store.

@@ -131,7 +131,7 @@ export function rebuildGameStateFromEvents(params: {
 
   const activeEvents = [...params.events]
     .filter((event) => !event.deleted_at)
-    .sort((a, b) => a.sequence - b.sequence);
+    .sort((a, b) => a.seq - b.seq);
 
   for (const event of activeEvents) {
     try {
@@ -146,7 +146,7 @@ export function rebuildGameStateFromEvents(params: {
         stateAfter: result.next,
       });
     } catch (error) {
-      errors.push(`Event ${event.sequence} konnte nicht verarbeitet werden: ${String(error)}`);
+      errors.push(`Event ${event.seq} konnte nicht verarbeitet werden: ${String(error)}`);
     }
   }
 

@@ -31,6 +31,7 @@ fn ensure_schema(conn: &Connection) {
         "ALTER TABLE teams ADD COLUMN coaches_json TEXT DEFAULT '[]'",
         "ALTER TABLE games ADD COLUMN notes TEXT",
         "ALTER TABLE game_events ADD COLUMN seq INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE game_events ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE game_events ADD COLUMN event_type TEXT NOT NULL DEFAULT 'play'",
         "ALTER TABLE game_events ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'",
         "ALTER TABLE game_events ADD COLUMN description TEXT",
@@ -39,8 +40,9 @@ fn ensure_schema(conn: &Connection) {
         "ALTER TABLE game_events ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE game_events ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE game_events ADD COLUMN deleted_at TEXT",
-        "CREATE TABLE IF NOT EXISTS game_events (id TEXT PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE, seq INTEGER NOT NULL, event_type TEXT NOT NULL, payload_json TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT)",
+        "CREATE TABLE IF NOT EXISTS game_events (id TEXT PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE, seq INTEGER NOT NULL DEFAULT 0, sequence INTEGER NOT NULL DEFAULT 0, event_type TEXT NOT NULL DEFAULT 'PLAY', payload_json TEXT NOT NULL DEFAULT '{}', description TEXT, quarter TEXT NOT NULL DEFAULT '1', clock_seconds INTEGER NOT NULL DEFAULT 720, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted_at TEXT)",
         "CREATE INDEX IF NOT EXISTS idx_game_events_game_seq ON game_events(game_id, seq)",
+        "CREATE INDEX IF NOT EXISTS idx_game_events_game_sequence ON game_events(game_id, sequence)",
         "CREATE INDEX IF NOT EXISTS idx_game_events_game_deleted ON game_events(game_id, deleted_at)",
     ] {
         let _ = conn.execute(sql, []);
@@ -448,10 +450,10 @@ fn delete_game(id: String) -> Result<(), String> {
 fn list_game_events(game_id: String) -> Result<Vec<GameEvent>, String> {
     let conn = open_db();
     let mut stmt = conn.prepare(
-        "SELECT id,game_id,seq,event_type,payload_json,description,created_at,updated_at,deleted_at
+        "SELECT id,game_id,COALESCE(NULLIF(seq,0), sequence) AS seq,event_type,payload_json,description,created_at,updated_at,deleted_at
          FROM game_events
          WHERE game_id=?1 AND deleted_at IS NULL
-         ORDER BY seq ASC"
+         ORDER BY COALESCE(NULLIF(seq,0), sequence) ASC"
     ).map_err(|e| e.to_string())?;
 
     let rows = stmt.query_map(params![game_id], |row| {
@@ -480,23 +482,26 @@ fn save_game_event(input: GameEventInput) -> Result<GameEvent, String> {
     let seq = match input.seq {
         Some(value) => value,
         None => conn.query_row(
-            "SELECT COALESCE(MAX(seq), 0) + 1 FROM game_events WHERE game_id=?1",
+            "SELECT COALESCE(MAX(COALESCE(NULLIF(seq,0), sequence)), 0) + 1 FROM game_events WHERE game_id=?1",
             params![input.game_id],
             |row| row.get::<_, i64>(0)
         ).map_err(|e| e.to_string())?,
     };
 
     conn.execute(
-        "INSERT INTO game_events(id,game_id,seq,event_type,payload_json,description,created_at,updated_at,deleted_at)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?7,NULL)
+        "INSERT INTO game_events(id,game_id,seq,sequence,event_type,payload_json,description,quarter,clock_seconds,created_at,updated_at,deleted_at)
+         VALUES(?1,?2,?3,?3,?4,?5,?6,?7,?8,?9,?9,NULL)
          ON CONFLICT(id) DO UPDATE SET
            seq=excluded.seq,
+           sequence=excluded.sequence,
            event_type=excluded.event_type,
            payload_json=excluded.payload_json,
            description=excluded.description,
+           quarter=excluded.quarter,
+           clock_seconds=excluded.clock_seconds,
            updated_at=excluded.updated_at,
            deleted_at=NULL",
-        params![id, input.game_id, seq, input.event_type, input.payload_json, input.description, now],
+        params![id, input.game_id, seq, input.event_type, input.payload_json, input.description, event_quarter_from_payload(&input.payload_json), event_clock_seconds_from_payload(&input.payload_json), now],
     ).map_err(|e| e.to_string())?;
 
     get_game_event(id)
@@ -506,7 +511,7 @@ fn save_game_event(input: GameEventInput) -> Result<GameEvent, String> {
 fn get_game_event(id: String) -> Result<GameEvent, String> {
     let conn = open_db();
     conn.query_row(
-        "SELECT id,game_id,seq,event_type,payload_json,description,created_at,updated_at,deleted_at
+        "SELECT id,game_id,COALESCE(NULLIF(seq,0), sequence) AS seq,event_type,payload_json,description,created_at,updated_at,deleted_at
          FROM game_events WHERE id=?1",
         params![id],
         |row| {
@@ -587,6 +592,34 @@ fn create_demo_seed() -> Result<(), String> {
     ).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+
+fn event_quarter_from_payload(payload_json: &str) -> String {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(payload_json) {
+        if let Some(q) = value.get("quarter").and_then(|v| v.as_str()) {
+            return q.to_string();
+        }
+        if let Some(q) = value.get("clock").and_then(|c| c.get("quarter")).and_then(|v| v.as_str()) {
+            return q.to_string();
+        }
+    }
+    "1".to_string()
+}
+
+fn event_clock_seconds_from_payload(payload_json: &str) -> i64 {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(payload_json) {
+        if let Some(s) = value.get("clockStartSeconds").and_then(|v| v.as_i64()) {
+            return s;
+        }
+        if let Some(s) = value.get("clock_start_seconds").and_then(|v| v.as_i64()) {
+            return s;
+        }
+        if let Some(s) = value.get("clock").and_then(|c| c.get("secondsRemaining")).and_then(|v| v.as_i64()) {
+            return s;
+        }
+    }
+    720
 }
 
 pub fn run() {

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS teams (
   secondary_color TEXT DEFAULT '#050505',
   logo_path TEXT,
   coaches_json TEXT DEFAULT '[]',
-  created_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL
 );
 
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS games (
   quarter_length_seconds INTEGER NOT NULL DEFAULT 720,
   status TEXT NOT NULL DEFAULT 'pregame',
   notes TEXT,
-  created_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL
 );
 
@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS game_events (
   id TEXT PRIMARY KEY,
   game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   seq INTEGER NOT NULL DEFAULT 0,
+  sequence INTEGER NOT NULL DEFAULT 0,
   event_type TEXT NOT NULL DEFAULT 'play',
   payload_json TEXT NOT NULL DEFAULT '{}',
   description TEXT,
@@ -59,8 +60,8 @@ CREATE TABLE IF NOT EXISTS game_events (
 CREATE TABLE IF NOT EXISTS plays (
   id TEXT PRIMARY KEY,
   game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  seq INTEGER NOT NULL,
-  quarter TEXT NOT NULL,
+  seq INTEGER NOT NULL DEFAULT 0,
+  quarter TEXT NOT NULL DEFAULT '1',
   clock_start_seconds INTEGER NOT NULL,
   clock_end_seconds INTEGER,
   offense_team_id TEXT NOT NULL REFERENCES teams(id),
@@ -78,7 +79,7 @@ CREATE TABLE IF NOT EXISTS plays (
   first_down INTEGER DEFAULT 0,
   result TEXT,
   notes TEXT,
-  created_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL
 );
 
@@ -86,7 +87,7 @@ CREATE TABLE IF NOT EXISTS drives (
   id TEXT PRIMARY KEY,
   game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   team_id TEXT NOT NULL REFERENCES teams(id),
-  start_play_seq INTEGER NOT NULL,
+  start_play_seq INTEGER NOT NULL DEFAULT 0,
   end_play_seq INTEGER,
   offensive_plays INTEGER NOT NULL DEFAULT 0,
   yards INTEGER NOT NULL DEFAULT 0,

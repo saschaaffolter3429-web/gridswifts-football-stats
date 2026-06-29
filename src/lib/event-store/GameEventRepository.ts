@@ -60,7 +60,7 @@ export async function removePlayEvent(eventId: string): Promise<void> {
 }
 
 export function parseStoredPlayEvent(event: GameEvent): StoredPlayEvent | null {
-  if (event.event_type !== 'PLAY') return null;
+  if (event.event_type.toUpperCase() !== 'PLAY') return null;
 
   try {
     return {

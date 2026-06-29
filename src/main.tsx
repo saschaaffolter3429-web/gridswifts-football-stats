@@ -46,9 +46,9 @@ function Dashboard({
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-gs-line bg-gs-card p-7">
-        <h1 className="text-4xl font-black">GridSwifts 2.1.0 Football Engine</h1>
+        <h1 className="text-4xl font-black">GridSwifts 2.1.3 Smart Play Engine</h1>
         <p className="mt-3 text-zinc-400 max-w-3xl">
-          Dieses Release legt das Herzstück der App an: eine unabhängige Football Engine.
+          Dieses Release erweitert den Smart Play Editor mit Templates, Shortcuts und besserer Football-IQ-Prüfung.
           Sie verarbeitet Plays und berechnet daraus automatisch GameState, Down, Distance, Ballposition, Score und Drives.
         </p>
         <div className="flex gap-3">

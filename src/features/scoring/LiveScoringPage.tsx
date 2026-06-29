@@ -115,21 +115,31 @@ export function LiveScoringPage() {
   }
 
   async function handleApply(_nextState: GameState, play: PlayInput, description: string) {
-    if (!selectedGame) return;
+    if (!selectedGame) {
+      throw new Error('Kein aktives Spiel ausgewählt.');
+    }
 
     try {
-      await appendPlayEvent({
+      setMessage('Speichere Play im Event Store...');
+
+      const savedEvent = await appendPlayEvent({
         gameId: selectedGame.id,
         play,
         description,
       });
 
       const storedEvents = await loadPlayEvents(selectedGame.id);
-      setEvents(storedEvents);
-      applyRebuild(selectedGame, storedEvents);
-      setMessage('Play gespeichert und Spielzustand aus Event Store neu berechnet.');
+      const nextEvents = storedEvents.some((event) => event.id === savedEvent.id)
+        ? storedEvents
+        : [...storedEvents, savedEvent].sort((a, b) => a.seq - b.seq);
+
+      setEvents(nextEvents);
+      applyRebuild(selectedGame, nextEvents);
+      setMessage(`Play gespeichert. ${nextEvents.length} Events in der Timeline.`);
     } catch (error) {
-      setMessage(`Fehler beim Speichern des Plays: ${String(error)}`);
+      const errorMessage = `Fehler beim Speichern des Plays: ${String(error)}`;
+      setMessage(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
