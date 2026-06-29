@@ -1,11 +1,12 @@
-import { Database, FileText, PlaySquare, RadioTower, Trophy, Users } from 'lucide-react';
+import { Database, FileText, PlaySquare, RadioTower, Trophy, Users, Zap } from 'lucide-react';
 
-export type Page = 'dashboard' | 'teams' | 'games' | 'broadcast' | 'reports' | 'database';
+export type Page = 'dashboard' | 'teams' | 'games' | 'scoring' | 'broadcast' | 'reports' | 'database';
 
 const nav: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <Trophy size={18} /> },
   { id: 'teams', label: 'Teams', icon: <Users size={18} /> },
   { id: 'games', label: 'Games', icon: <PlaySquare size={18} /> },
+  { id: 'scoring', label: 'Live Scoring', icon: <Zap size={18} /> },
   { id: 'broadcast', label: 'Broadcast', icon: <RadioTower size={18} /> },
   { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
   { id: 'database', label: 'Database', icon: <Database size={18} /> },
@@ -25,7 +26,7 @@ export function Shell({
       <div className="grid grid-cols-[260px_1fr] min-h-screen">
         <aside className="border-r border-gs-line bg-[#0b0b0c] p-6">
           <h1 className="text-3xl font-black">GridSwifts</h1>
-          <p className="text-gs-soft text-xs tracking-[0.3em] uppercase mt-1">Football Stats 2.0.2</p>
+          <p className="text-gs-soft text-xs tracking-[0.3em] uppercase mt-1">Football Stats 2.1.0</p>
 
           <nav className="mt-10 space-y-2">
             {nav.map((item) => (
@@ -49,9 +50,9 @@ export function Shell({
           <header className="h-16 border-b border-gs-line bg-[#111113] flex items-center justify-between px-6">
             <div>
               <h2 className="font-bold text-lg">Game Operations Center</h2>
-              <p className="text-xs text-zinc-400">Team- und Spielverwaltung mit zentraler SQLite-Datenbank</p>
+              <p className="text-xs text-zinc-400">Football Engine Foundation: GameState → Play → New GameState</p>
             </div>
-            <div className="rounded-full bg-gs-orange text-black px-4 py-2 font-bold">v2.0.2 fixed</div>
+            <div className="rounded-full bg-gs-orange text-black px-4 py-2 font-bold">v2.1.0 Engine</div>
           </header>
 
           <div className="p-6">{children}</div>

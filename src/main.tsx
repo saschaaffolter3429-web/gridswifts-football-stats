@@ -4,6 +4,7 @@ import { databasePath } from './lib/api';
 import { Shell, type Page } from './components/Shell';
 import { TeamsPage } from './features/teams/TeamsPage';
 import { GamesPage } from './features/games/GamesPage';
+import { LiveScoringPage } from './features/scoring/LiveScoringPage';
 import './styles.css';
 
 function App() {
@@ -18,36 +19,55 @@ function App() {
     <Shell page={page} setPage={setPage}>
       {page === 'teams' && <TeamsPage />}
       {page === 'games' && <GamesPage />}
-      {page !== 'teams' && page !== 'games' && (
-        <Dashboard db={db} goTeams={() => setPage('teams')} goGames={() => setPage('games')} />
+      {page === 'scoring' && <LiveScoringPage />}
+      {page !== 'teams' && page !== 'games' && page !== 'scoring' && (
+        <Dashboard
+          db={db}
+          goTeams={() => setPage('teams')}
+          goGames={() => setPage('games')}
+          goScoring={() => setPage('scoring')}
+        />
       )}
     </Shell>
   );
 }
 
-function Dashboard({ db, goTeams, goGames }: { db: string; goTeams: () => void; goGames: () => void }) {
+function Dashboard({
+  db,
+  goTeams,
+  goGames,
+  goScoring,
+}: {
+  db: string;
+  goTeams: () => void;
+  goGames: () => void;
+  goScoring: () => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-gs-line bg-gs-card p-7">
-        <h1 className="text-4xl font-black">GridSwifts 2.0.2</h1>
+        <h1 className="text-4xl font-black">GridSwifts 2.1.0 Football Engine</h1>
         <p className="mt-3 text-zinc-400 max-w-3xl">
-          Dieses Release ergänzt die Spielverwaltung. Teams können nun in echten Games verwendet werden.
-          Das Game Setup ist die Basis für Play Log, Drives, Box Score und Broadcast.
+          Dieses Release legt das Herzstück der App an: eine unabhängige Football Engine.
+          Sie verarbeitet Plays und berechnet daraus automatisch GameState, Down, Distance, Ballposition, Score und Drives.
         </p>
         <div className="flex gap-3">
           <button onClick={goTeams} className="mt-6 rounded-2xl bg-gs-card2 border border-gs-line px-6 py-3 text-white font-black">
-            Teamverwaltung öffnen
+            Teams
           </button>
-          <button onClick={goGames} className="mt-6 rounded-2xl bg-gs-orange px-6 py-3 text-black font-black">
-            Spielverwaltung öffnen
+          <button onClick={goGames} className="mt-6 rounded-2xl bg-gs-card2 border border-gs-line px-6 py-3 text-white font-black">
+            Games
+          </button>
+          <button onClick={goScoring} className="mt-6 rounded-2xl bg-gs-orange px-6 py-3 text-black font-black">
+            Live Scoring Demo öffnen
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card title="Zentrale Datenbank" value="Aktiv" sub={db || 'wird geladen...'} />
-        <Card title="Modul" value="Games" sub="erstellen, bearbeiten, löschen" />
-        <Card title="Nächster Schritt" value="Live Scoring" sub="Play Log 2.1.0" />
+        <Card title="Engine" value="Aktiv" sub="GameState → Play → New GameState" />
+        <Card title="Datenbank" value="SQLite" sub={db || 'wird geladen...'} />
+        <Card title="Nächster Schritt" value="Play Editor" sub="echte Spieler-/Game-Anbindung" />
       </div>
     </div>
   );
