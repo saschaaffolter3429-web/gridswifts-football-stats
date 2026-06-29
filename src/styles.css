@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #050505;
+  color: white;
+  font-family: Inter, system-ui, Segoe UI, sans-serif;
+}
+
+input, select, button {
+  font-family: inherit;
+}
