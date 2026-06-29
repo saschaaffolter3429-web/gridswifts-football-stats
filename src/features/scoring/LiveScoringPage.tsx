@@ -1,21 +1,29 @@
 import { useMemo, useState } from 'react';
-import { applyPlay, createInitialGameState, yardlineLabel, type GameState, type PlayInput, type PlayKind } from '../../lib/football-engine';
+import { createInitialGameState, yardlineLabel, type GameState, type PlayInput } from '../../lib/football-engine';
+import type { EditorPlayer } from '../../lib/play-editor/playEditorTypes';
+import { SmartPlayEditor } from './SmartPlayEditor';
 
 const HOME = 'HOME';
 const AWAY = 'AWAY';
 
-const playKinds: PlayKind[] = [
-  'RUSH',
-  'PASS_COMPLETE',
-  'PASS_INCOMPLETE',
-  'SACK',
-  'SCRAMBLE',
-  'PUNT',
-  'FIELD_GOAL_GOOD',
-  'FIELD_GOAL_MISSED',
-  'INTERCEPTION',
-  'FUMBLE',
-  'PENALTY',
+const demoPlayers: EditorPlayer[] = [
+  { id: 'home_qb_12', teamId: HOME, number: '12', name: 'Home Quarterback', position: 'QB' },
+  { id: 'home_rb_21', teamId: HOME, number: '21', name: 'Home Running Back', position: 'RB' },
+  { id: 'home_wr_11', teamId: HOME, number: '11', name: 'Home Receiver', position: 'WR' },
+  { id: 'home_te_88', teamId: HOME, number: '88', name: 'Home Tight End', position: 'TE' },
+  { id: 'home_k_7', teamId: HOME, number: '7', name: 'Home Kicker', position: 'K' },
+  { id: 'home_p_9', teamId: HOME, number: '9', name: 'Home Punter', position: 'P' },
+  { id: 'home_lb_44', teamId: HOME, number: '44', name: 'Home Linebacker', position: 'LB' },
+  { id: 'home_cb_2', teamId: HOME, number: '2', name: 'Home Corner', position: 'CB' },
+
+  { id: 'away_qb_4', teamId: AWAY, number: '4', name: 'Away Quarterback', position: 'QB' },
+  { id: 'away_rb_24', teamId: AWAY, number: '24', name: 'Away Running Back', position: 'RB' },
+  { id: 'away_wr_10', teamId: AWAY, number: '10', name: 'Away Receiver', position: 'WR' },
+  { id: 'away_te_85', teamId: AWAY, number: '85', name: 'Away Tight End', position: 'TE' },
+  { id: 'away_k_6', teamId: AWAY, number: '6', name: 'Away Kicker', position: 'K' },
+  { id: 'away_p_8', teamId: AWAY, number: '8', name: 'Away Punter', position: 'P' },
+  { id: 'away_lb_52', teamId: AWAY, number: '52', name: 'Away Linebacker', position: 'LB' },
+  { id: 'away_s_3', teamId: AWAY, number: '3', name: 'Away Safety', position: 'S' },
 ];
 
 export function LiveScoringPage() {
@@ -33,120 +41,56 @@ export function LiveScoringPage() {
 
   const [state, setState] = useState<GameState>(initial);
   const [history, setHistory] = useState<string[]>([]);
-  const [kind, setKind] = useState<PlayKind>('RUSH');
-  const [yards, setYards] = useState(0);
-  const [returnYards, setReturnYards] = useState(0);
-  const [clockEnd, setClockEnd] = useState(700);
-  const [message, setMessage] = useState('');
 
-  function submitPlay() {
-    const play: PlayInput = {
-      id: `play_${state.playIndex + 1}`,
-      kind,
-      yards: Number(yards),
-      returnYards: Number(returnYards),
-      clockStartSeconds: state.clock.secondsRemaining,
-      clockEndSeconds: Number(clockEnd),
-      turnover: kind === 'INTERCEPTION',
-    };
-
-    const result = applyPlay(state, play);
-    setState(result.next);
-    setHistory((old) => [result.description, ...old]);
-    setMessage(result.warnings.length ? result.warnings.join(' | ') : 'Play verarbeitet.');
-    setClockEnd(Math.max(0, Number(clockEnd) - 20));
-    setYards(0);
-    setReturnYards(0);
+  function handleApply(nextState: GameState, play: PlayInput, description: string) {
+    setState(nextState);
+    setHistory((old) => [`${play.kind}: ${description}`, ...old]);
   }
 
   function reset() {
     setState(initial);
     setHistory([]);
-    setMessage('Zurückgesetzt.');
   }
 
   const offense = state.possessionTeamId === HOME ? 'HOME' : 'AWAY';
   const defense = state.defenseTeamId === HOME ? 'HOME' : 'AWAY';
 
   return (
-    <div className="grid grid-cols-[1fr_420px] gap-6">
-      <section className="space-y-6">
-        <div className="rounded-3xl border border-gs-line bg-black overflow-hidden">
-          <div className="bg-[#151517] px-6 py-5 flex items-center justify-center gap-10">
-            <ScoreTeam label="AWAY" score={state.score[AWAY] ?? 0} active={state.possessionTeamId === AWAY} />
-            <div className="text-gs-orange font-black text-2xl">VS</div>
-            <ScoreTeam label="HOME" score={state.score[HOME] ?? 0} active={state.possessionTeamId === HOME} />
-          </div>
-
-          <div className="p-6 grid grid-cols-4 gap-4">
-            <Info label="Quarter" value={state.clock.quarter} />
-            <Info label="Clock" value={formatClock(state.clock.secondsRemaining)} />
-            <Info label="Down & Distance" value={`${state.down} & ${state.distance}`} />
-            <Info label="Ball" value={yardlineLabel(state.absoluteYardline, offense, defense)} />
-          </div>
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-gs-line bg-black overflow-hidden">
+        <div className="bg-[#151517] px-6 py-5 flex items-center justify-center gap-10">
+          <ScoreTeam label="AWAY" score={state.score[AWAY] ?? 0} active={state.possessionTeamId === AWAY} />
+          <div className="text-gs-orange font-black text-2xl">VS</div>
+          <ScoreTeam label="HOME" score={state.score[HOME] ?? 0} active={state.possessionTeamId === HOME} />
         </div>
 
-        <div className="rounded-3xl border border-gs-line bg-gs-card p-6">
-          <h2 className="text-2xl font-black">Football Engine Demo</h2>
-          <p className="text-sm text-zinc-400 mt-2">
-            Diese Seite verwendet bereits die neue Engine. Down, Distance, Ballposition, Score und Drives werden aus Plays berechnet.
-          </p>
-
-          {message && <div className="mt-4 rounded-2xl bg-gs-orange/10 border border-gs-orange/30 text-gs-soft px-4 py-3">{message}</div>}
-
-          <div className="grid grid-cols-4 gap-4 mt-6">
-            <Field label="Play Type">
-              <select className="input" value={kind} onChange={(e) => setKind(e.target.value as PlayKind)}>
-                {playKinds.map((p) => <option key={p}>{p}</option>)}
-              </select>
-            </Field>
-
-            <Field label="Yards">
-              <input className="input" type="number" value={yards} onChange={(e) => setYards(Number(e.target.value))} />
-            </Field>
-
-            <Field label="Return Yards">
-              <input className="input" type="number" value={returnYards} onChange={(e) => setReturnYards(Number(e.target.value))} />
-            </Field>
-
-            <Field label="Clock End">
-              <input className="input" type="number" value={clockEnd} onChange={(e) => setClockEnd(Number(e.target.value))} />
-            </Field>
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <button onClick={submitPlay} className="rounded-2xl bg-gs-orange text-black px-6 py-3 font-black">
-              Play anwenden
-            </button>
-            <button onClick={reset} className="rounded-2xl bg-gs-card2 border border-gs-line text-white px-6 py-3 font-black">
-              Reset
-            </button>
-          </div>
+        <div className="p-6 grid grid-cols-5 gap-4">
+          <Info label="Quarter" value={state.clock.quarter} />
+          <Info label="Clock" value={formatClock(state.clock.secondsRemaining)} />
+          <Info label="Down & Distance" value={`${state.down} & ${state.distance}`} />
+          <Info label="Ball" value={yardlineLabel(state.absoluteYardline, offense, defense)} />
+          <Info label="Drive Plays" value={state.currentDrive.offensivePlays} />
         </div>
+      </div>
 
-        <div className="rounded-3xl border border-gs-line bg-gs-card p-6">
-          <h2 className="text-xl font-black mb-4">Current Drive</h2>
-          <div className="grid grid-cols-5 gap-3">
-            <Info label="Team" value={state.currentDrive.teamId} />
-            <Info label="Plays" value={state.currentDrive.offensivePlays} />
-            <Info label="Yards" value={state.currentDrive.yards} />
-            <Info label="TOP" value={formatClock(state.currentDrive.durationSeconds)} />
-            <Info label="Result" value={state.currentDrive.result} />
-          </div>
+      <SmartPlayEditor state={state} players={demoPlayers} onApply={handleApply} />
+
+      <div className="rounded-3xl border border-gs-line bg-gs-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-black">Play Timeline</h2>
+          <button onClick={reset} className="rounded-2xl bg-gs-card2 border border-gs-line px-4 py-2 font-bold">
+            Reset Demo
+          </button>
         </div>
-      </section>
-
-      <aside className="rounded-3xl border border-gs-line bg-gs-card p-5 h-[calc(100vh-7rem)] overflow-auto">
-        <h2 className="text-xl font-black mb-4">Engine Play History</h2>
         <div className="space-y-2">
-          {history.map((h, i) => (
-            <div key={i} className="rounded-2xl bg-gs-card2 border border-gs-line p-4 text-sm">
-              {h}
+          {history.map((item, index) => (
+            <div key={`${item}_${index}`} className="rounded-2xl bg-gs-card2 border border-gs-line p-4 text-sm">
+              {item}
             </div>
           ))}
-          {!history.length && <div className="text-zinc-500 text-sm text-center p-8">Noch keine Plays.</div>}
+          {!history.length && <div className="text-zinc-500 text-center py-8">Noch keine Plays.</div>}
         </div>
-      </aside>
+      </div>
     </div>
   );
 }
@@ -170,15 +114,6 @@ function Info({ label, value }: { label: string; value: string | number }) {
       <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">{label}</div>
       <div className="mt-2 text-xl font-black">{value}</div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">{label}</span>
-      {children}
-    </label>
   );
 }
 
