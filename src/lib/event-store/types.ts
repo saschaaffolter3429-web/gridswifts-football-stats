@@ -1,4 +1,4 @@
-import type { PlayInput } from '../football-engine';
+import type { GameState, PlayInput } from '../football-engine';
 import type { GameEvent } from '../api';
 
 export type StoredPlayEvent = GameEvent & {
@@ -6,7 +6,7 @@ export type StoredPlayEvent = GameEvent & {
 };
 
 export type RebuildResult = {
-  state: import('../football-engine').GameState;
+  state: GameState;
   timeline: RebuiltTimelineItem[];
   warnings: string[];
 };
@@ -16,4 +16,6 @@ export type RebuiltTimelineItem = {
   seq: number;
   play: PlayInput;
   description: string;
+  before: GameState;
+  after: GameState;
 };

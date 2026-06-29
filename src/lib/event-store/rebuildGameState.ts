@@ -1,6 +1,6 @@
 import { applyPlay, createInitialGameState, type GameState } from '../football-engine';
 import type { Game as ApiGame } from '../api';
-import type { StoredPlayEvent, RebuildResult, RebuiltTimelineItem } from './types';
+import type { StoredPlayEvent, RebuildResult } from './types';
 
 type RebuildParams = {
   game: ApiGame;
@@ -31,22 +31,30 @@ export function rebuildGameStateFromEvents(params: RebuildParams): RebuildResult
     startAbsoluteYardline: params.startAbsoluteYardline,
   });
 
-  const timeline: RebuiltTimelineItem[] = [];
+  const timeline: RebuildResult['timeline'] = [];
   const warnings: string[] = [];
   const orderedEvents = [...params.events].sort((a, b) => a.seq - b.seq);
 
   for (const event of orderedEvents) {
+    const before = cloneState(state);
     const result = applyPlay(state, event.play);
     state = result.next;
+
     timeline.push({
       eventId: event.id,
       seq: event.seq,
       play: event.play,
       description: event.description ?? result.description,
+      before,
+      after: cloneState(result.next),
     });
 
     warnings.push(...result.warnings.map((warning) => `Event ${event.seq}: ${warning}`));
   }
 
   return { state, timeline, warnings };
+}
+
+function cloneState(state: GameState): GameState {
+  return JSON.parse(JSON.stringify(state));
 }
