@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import {
-  createInitialGameState,
   yardlineLabel,
   type GameState,
   type PlayInput,
@@ -14,6 +14,13 @@ import {
   type Player,
   type Team,
 } from '../../lib/api';
+import {
+  appendPlayEvent,
+  loadAndRebuildGame,
+  softClearGameEvents,
+  softDeletePlayEvent,
+  type TimelineItem,
+} from '../../lib/game-events';
 import { SmartPlayEditor } from './SmartPlayEditor';
 
 export function LiveScoringPage() {
@@ -22,8 +29,10 @@ export function LiveScoringPage() {
   const [players, setPlayers] = useState<EditorPlayer[]>([]);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [state, setState] = useState<GameState | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [message, setMessage] = useState('');
+  const [rebuildErrors, setRebuildErrors] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const selectedGame = useMemo(
     () => games.find((game) => game.id === selectedGameId),
@@ -70,26 +79,20 @@ export function LiveScoringPage() {
 
   async function loadGameContext(game: Game) {
     try {
-      const [homeRoster, awayRoster] = await Promise.all([
+      const [homeRoster, awayRoster, rebuild] = await Promise.all([
         listPlayers(game.home_team_id),
         listPlayers(game.away_team_id),
+        loadAndRebuildGame({ game }),
       ]);
 
       const mappedPlayers = [...homeRoster, ...awayRoster].map(mapPlayer);
       setPlayers(mappedPlayers);
-
-      const initialState = createInitialGameState({
-        gameId: game.id,
-        homeTeamId: game.home_team_id,
-        awayTeamId: game.away_team_id,
-        receivingTeamId: game.home_team_id,
-        startAbsoluteYardline: 25,
-        quarterLengthSeconds: game.quarter_length_seconds,
-      });
-
-      setState(initialState);
-      setHistory([]);
-      setMessage(`Spiel geladen: ${game.away_abbr} @ ${game.home_abbr}. ${mappedPlayers.length} Spieler verfügbar.`);
+      setState(rebuild.finalState);
+      setTimeline(rebuild.timeline);
+      setRebuildErrors(rebuild.errors);
+      setMessage(
+        `Spiel geladen: ${game.away_abbr} @ ${game.home_abbr}. ${mappedPlayers.length} Spieler, ${rebuild.events.length} Events.`,
+      );
     } catch (error) {
       setMessage(`Fehler beim Laden des Spiels: ${String(error)}`);
     }
@@ -105,15 +108,57 @@ export function LiveScoringPage() {
     };
   }
 
-  function handleApply(nextState: GameState, play: PlayInput, description: string) {
-    setState(nextState);
-    setHistory((old) => [`${play.kind}: ${description}`, ...old]);
-    setMessage('Play verarbeitet. Persistenz/Event Store folgt im nächsten Teil von 2.1.2.');
+  async function handleApply(_nextState: GameState, play: PlayInput) {
+    if (!selectedGame || !state) return;
+
+    setIsSaving(true);
+    try {
+      await appendPlayEvent({
+        gameId: selectedGame.id,
+        play,
+        quarter: state.clock.quarter,
+        clockStartSeconds: play.clockStartSeconds ?? state.clock.secondsRemaining,
+        clockEndSeconds: play.clockEndSeconds ?? null,
+      });
+
+      await loadGameContext(selectedGame);
+      setMessage('Play gespeichert und GameState aus Event Store neu aufgebaut.');
+    } catch (error) {
+      setMessage(`Fehler beim Speichern des Events: ${String(error)}`);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function resetCurrentGame() {
-    if (selectedGame) {
-      loadGameContext(selectedGame);
+  async function deleteTimelineEvent(item: TimelineItem) {
+    if (!selectedGame) return;
+    if (!confirm(`Play ${item.event.sequence} wirklich löschen und Spiel neu berechnen?`)) return;
+
+    setIsSaving(true);
+    try {
+      await softDeletePlayEvent(item.event.id);
+      await loadGameContext(selectedGame);
+      setMessage('Play gelöscht und GameState neu berechnet.');
+    } catch (error) {
+      setMessage(`Fehler beim Löschen: ${String(error)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function resetCurrentGame() {
+    if (!selectedGame) return;
+    if (!confirm('Alle Plays dieses Spiels wirklich soft-löschen?')) return;
+
+    setIsSaving(true);
+    try {
+      await softClearGameEvents(selectedGame.id);
+      await loadGameContext(selectedGame);
+      setMessage('Alle Events wurden entfernt. Spielzustand zurückgesetzt.');
+    } catch (error) {
+      setMessage(`Fehler beim Zurücksetzen: ${String(error)}`);
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -124,7 +169,7 @@ export function LiveScoringPage() {
           <div>
             <h1 className="text-3xl font-black">Live Scoring</h1>
             <p className="text-sm text-zinc-400 mt-2">
-              Production Integration: echtes Spiel, echte Teams und echte Roster aus SQLite.
+              Event Store aktiv: jedes Play wird gespeichert und der GameState wird aus Events neu aufgebaut.
             </p>
           </div>
 
@@ -150,6 +195,15 @@ export function LiveScoringPage() {
         {message && (
           <div className="mt-4 rounded-2xl bg-gs-orange/10 border border-gs-orange/30 text-gs-soft px-4 py-3">
             {message}
+          </div>
+        )}
+
+        {rebuildErrors.length > 0 && (
+          <div className="mt-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 px-4 py-3">
+            <div className="font-black mb-2">Rebuild-Warnungen</div>
+            {rebuildErrors.map((error) => (
+              <div key={error} className="text-sm">{error}</div>
+            ))}
           </div>
         )}
       </div>
@@ -180,21 +234,40 @@ export function LiveScoringPage() {
 
           <div className="rounded-3xl border border-gs-line bg-gs-card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-black">Play Timeline</h2>
+              <div>
+                <h2 className="text-xl font-black">Event Timeline</h2>
+                <p className="text-sm text-zinc-400">
+                  Diese Liste kommt aus der SQLite-Tabelle game_events. Löschen führt sofort zu Rebuild.
+                </p>
+              </div>
               <button
+                disabled={isSaving || timeline.length === 0}
                 onClick={resetCurrentGame}
-                className="rounded-2xl bg-gs-card2 border border-gs-line px-4 py-2 font-bold"
+                className="rounded-2xl bg-gs-card2 border border-gs-line px-4 py-2 font-bold disabled:opacity-40"
               >
-                Spielzustand zurücksetzen
+                Alle Plays zurücksetzen
               </button>
             </div>
             <div className="space-y-2">
-              {history.map((item, index) => (
-                <div key={`${item}_${index}`} className="rounded-2xl bg-gs-card2 border border-gs-line p-4 text-sm">
-                  {item}
+              {timeline.map((item) => (
+                <div key={item.event.id} className="rounded-2xl bg-gs-card2 border border-gs-line p-4 text-sm flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs text-zinc-500 uppercase tracking-[0.2em]">
+                      #{item.event.sequence} · Q{item.event.quarter} · {item.play.kind}
+                    </div>
+                    <div className="font-bold mt-1">{item.description}</div>
+                  </div>
+                  <button
+                    disabled={isSaving}
+                    onClick={() => deleteTimelineEvent(item)}
+                    className="rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 px-3 py-2 disabled:opacity-40"
+                    title="Play löschen"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               ))}
-              {!history.length && <div className="text-zinc-500 text-center py-8">Noch keine Plays.</div>}
+              {!timeline.length && <div className="text-zinc-500 text-center py-8">Noch keine Plays.</div>}
             </div>
           </div>
         </>

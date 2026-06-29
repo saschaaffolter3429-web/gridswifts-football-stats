@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.2 Event Store Foundation
+
+- Added persistent `game_events` table.
+- Added Tauri commands for saving, loading, updating and soft-deleting game events.
+- Added TypeScript Event Store and GameState rebuild workflow.
+- Live Scoring now persists submitted plays and rebuilds state from events.
+- Timeline events can be soft-deleted and the game recalculates immediately.
+
 ## 2.1.1 Planned
 
 - Smart Play Editor

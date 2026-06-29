@@ -80,4 +80,21 @@ CREATE TABLE IF NOT EXISTS drives (
   result TEXT NOT NULL DEFAULT 'In Progress'
 );
 
-INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.0.2-fixed');
+CREATE TABLE IF NOT EXISTS game_events (
+  id TEXT PRIMARY KEY,
+  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL,
+  quarter TEXT NOT NULL,
+  clock_start_seconds INTEGER,
+  clock_end_seconds INTEGER,
+  event_type TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_events_game_sequence ON game_events(game_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_game_events_game_deleted ON game_events(game_id, deleted_at);
+
+INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.1.2-event-store');

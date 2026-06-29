@@ -69,6 +69,39 @@ export type GameInput = {
   notes?: string | null;
 };
 
+export type GameEvent = {
+  id: string;
+  game_id: string;
+  sequence: number;
+  quarter: string;
+  clock_start_seconds?: number | null;
+  clock_end_seconds?: number | null;
+  event_type: string;
+  payload_json: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
+export type GameEventInput = {
+  id?: string | null;
+  game_id: string;
+  quarter: string;
+  clock_start_seconds?: number | null;
+  clock_end_seconds?: number | null;
+  event_type: string;
+  payload_json: string;
+};
+
+export type GameEventUpdateInput = {
+  id: string;
+  quarter?: string | null;
+  clock_start_seconds?: number | null;
+  clock_end_seconds?: number | null;
+  event_type?: string | null;
+  payload_json?: string | null;
+};
+
 export async function databasePath(): Promise<string> {
   return invoke<string>('database_path');
 }
@@ -107,6 +140,27 @@ export async function saveGame(input: GameInput): Promise<Game> {
 
 export async function deleteGame(id: string): Promise<void> {
   return invoke<void>('delete_game', { id });
+}
+
+
+export async function listGameEvents(gameId: string): Promise<GameEvent[]> {
+  return invoke<GameEvent[]>('list_game_events', { gameId });
+}
+
+export async function saveGameEvent(input: GameEventInput): Promise<GameEvent> {
+  return invoke<GameEvent>('save_game_event', { input });
+}
+
+export async function updateGameEvent(input: GameEventUpdateInput): Promise<GameEvent> {
+  return invoke<GameEvent>('update_game_event', { input });
+}
+
+export async function deleteGameEvent(id: string): Promise<void> {
+  return invoke<void>('delete_game_event', { id });
+}
+
+export async function clearGameEvents(gameId: string): Promise<void> {
+  return invoke<void>('clear_game_events', { gameId });
 }
 
 export async function createDemoSeed(): Promise<void> {

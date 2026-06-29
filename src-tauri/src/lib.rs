@@ -33,6 +33,24 @@ fn ensure_schema(conn: &Connection) {
     ] {
         let _ = conn.execute(sql, []);
     }
+
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS game_events (
+            id TEXT PRIMARY KEY,
+            game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+            sequence INTEGER NOT NULL,
+            quarter TEXT NOT NULL,
+            clock_start_seconds INTEGER,
+            clock_end_seconds INTEGER,
+            event_type TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_game_events_game_sequence ON game_events(game_id, sequence);
+        CREATE INDEX IF NOT EXISTS idx_game_events_game_deleted ON game_events(game_id, deleted_at);"
+    ).unwrap();
 }
 
 fn new_id(prefix: &str) -> String {
@@ -117,6 +135,42 @@ struct GameInput {
     quarter_length_seconds: i64,
     status: String,
     notes: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GameEvent {
+    id: String,
+    game_id: String,
+    sequence: i64,
+    quarter: String,
+    clock_start_seconds: Option<i64>,
+    clock_end_seconds: Option<i64>,
+    event_type: String,
+    payload_json: String,
+    created_at: String,
+    updated_at: String,
+    deleted_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GameEventInput {
+    id: Option<String>,
+    game_id: String,
+    quarter: String,
+    clock_start_seconds: Option<i64>,
+    clock_end_seconds: Option<i64>,
+    event_type: String,
+    payload_json: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GameEventUpdateInput {
+    id: String,
+    quarter: Option<String>,
+    clock_start_seconds: Option<i64>,
+    clock_end_seconds: Option<i64>,
+    event_type: Option<String>,
+    payload_json: Option<String>,
 }
 
 #[tauri::command]
@@ -400,9 +454,152 @@ fn save_game(input: GameInput) -> Result<Game, String> {
 #[tauri::command]
 fn delete_game(id: String) -> Result<(), String> {
     let conn = open_db();
+    conn.execute("DELETE FROM game_events WHERE game_id=?1", params![id]).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM plays WHERE game_id=?1", params![id]).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM drives WHERE game_id=?1", params![id]).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM games WHERE id=?1", params![id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn list_game_events(game_id: String) -> Result<Vec<GameEvent>, String> {
+    let conn = open_db();
+    let mut stmt = conn.prepare(
+        "SELECT id,game_id,sequence,quarter,clock_start_seconds,clock_end_seconds,event_type,payload_json,created_at,updated_at,deleted_at
+         FROM game_events
+         WHERE game_id=?1 AND deleted_at IS NULL
+         ORDER BY sequence ASC"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map(params![game_id], |row| {
+        Ok(GameEvent {
+            id: row.get(0)?,
+            game_id: row.get(1)?,
+            sequence: row.get(2)?,
+            quarter: row.get(3)?,
+            clock_start_seconds: row.get(4)?,
+            clock_end_seconds: row.get(5)?,
+            event_type: row.get(6)?,
+            payload_json: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
+            deleted_at: row.get(10)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_game_event(input: GameEventInput) -> Result<GameEvent, String> {
+    // Validate JSON early so corrupt events do not enter the Event Store.
+    let _: serde_json::Value = serde_json::from_str(&input.payload_json).map_err(|e| format!("Ungültiges Event JSON: {e}"))?;
+
+    let conn = open_db();
+    let now = chrono::Utc::now().to_rfc3339();
+    let id = input.id.unwrap_or_else(|| new_id("event"));
+    let sequence: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sequence), 0) + 1 FROM game_events WHERE game_id=?1",
+        params![input.game_id],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO game_events(id,game_id,sequence,quarter,clock_start_seconds,clock_end_seconds,event_type,payload_json,created_at,updated_at,deleted_at)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9,NULL)",
+        params![
+            id,
+            input.game_id,
+            sequence,
+            input.quarter,
+            input.clock_start_seconds,
+            input.clock_end_seconds,
+            input.event_type,
+            input.payload_json,
+            now,
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    get_game_event(id)
+}
+
+#[tauri::command]
+fn get_game_event(id: String) -> Result<GameEvent, String> {
+    let conn = open_db();
+    conn.query_row(
+        "SELECT id,game_id,sequence,quarter,clock_start_seconds,clock_end_seconds,event_type,payload_json,created_at,updated_at,deleted_at
+         FROM game_events WHERE id=?1",
+        params![id],
+        |row| {
+            Ok(GameEvent {
+                id: row.get(0)?,
+                game_id: row.get(1)?,
+                sequence: row.get(2)?,
+                quarter: row.get(3)?,
+                clock_start_seconds: row.get(4)?,
+                clock_end_seconds: row.get(5)?,
+                event_type: row.get(6)?,
+                payload_json: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                deleted_at: row.get(10)?,
+            })
+        }
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn update_game_event(input: GameEventUpdateInput) -> Result<GameEvent, String> {
+    if let Some(payload) = &input.payload_json {
+        let _: serde_json::Value = serde_json::from_str(payload).map_err(|e| format!("Ungültiges Event JSON: {e}"))?;
+    }
+
+    let conn = open_db();
+    let now = chrono::Utc::now().to_rfc3339();
+    let existing = get_game_event(input.id.clone())?;
+
+    conn.execute(
+        "UPDATE game_events SET
+            quarter=?2,
+            clock_start_seconds=?3,
+            clock_end_seconds=?4,
+            event_type=?5,
+            payload_json=?6,
+            updated_at=?7
+         WHERE id=?1",
+        params![
+            input.id,
+            input.quarter.unwrap_or(existing.quarter),
+            input.clock_start_seconds.or(existing.clock_start_seconds),
+            input.clock_end_seconds.or(existing.clock_end_seconds),
+            input.event_type.unwrap_or(existing.event_type),
+            input.payload_json.unwrap_or(existing.payload_json),
+            now,
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    get_game_event(existing.id)
+}
+
+#[tauri::command]
+fn delete_game_event(id: String) -> Result<(), String> {
+    let conn = open_db();
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE game_events SET deleted_at=?2, updated_at=?2 WHERE id=?1",
+        params![id, now],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_game_events(game_id: String) -> Result<(), String> {
+    let conn = open_db();
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE game_events SET deleted_at=?2, updated_at=?2 WHERE game_id=?1 AND deleted_at IS NULL",
+        params![game_id, now],
+    ).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -466,6 +663,12 @@ pub fn run() {
             get_game,
             save_game,
             delete_game,
+            list_game_events,
+            get_game_event,
+            save_game_event,
+            update_game_event,
+            delete_game_event,
+            clear_game_events,
             create_demo_seed
         ])
         .run(tauri::generate_context!())
