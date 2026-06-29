@@ -42,6 +42,20 @@ CREATE TABLE IF NOT EXISTS games (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS game_events (
+  id TEXT PRIMARY KEY,
+  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  seq INTEGER NOT NULL DEFAULT 0,
+  event_type TEXT NOT NULL DEFAULT 'play',
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  description TEXT,
+  quarter TEXT,
+  clock_seconds INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS plays (
   id TEXT PRIMARY KEY,
   game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -80,21 +94,4 @@ CREATE TABLE IF NOT EXISTS drives (
   result TEXT NOT NULL DEFAULT 'In Progress'
 );
 
-CREATE TABLE IF NOT EXISTS game_events (
-  id TEXT PRIMARY KEY,
-  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  sequence INTEGER NOT NULL,
-  quarter TEXT NOT NULL,
-  clock_start_seconds INTEGER,
-  clock_end_seconds INTEGER,
-  event_type TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  deleted_at TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_game_events_game_sequence ON game_events(game_id, sequence);
-CREATE INDEX IF NOT EXISTS idx_game_events_game_deleted ON game_events(game_id, deleted_at);
-
-INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.1.2-event-store');
+INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.1.2-event-store-fixed');

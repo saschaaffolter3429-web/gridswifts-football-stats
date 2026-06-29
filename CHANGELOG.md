@@ -2,11 +2,11 @@
 
 ## 2.1.2 Event Store Foundation
 
-- Added persistent `game_events` table.
-- Added Tauri commands for saving, loading, updating and soft-deleting game events.
-- Added TypeScript Event Store and GameState rebuild workflow.
-- Live Scoring now persists submitted plays and rebuilds state from events.
-- Timeline events can be soft-deleted and the game recalculates immediately.
+- Added persistent game event store.
+- Live Scoring saves submitted plays to SQLite.
+- Game state rebuilds from stored events.
+- Timeline supports soft-delete and rebuild.
+
 
 ## 2.1.1 Planned
 
