@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS games (
   away_team_id TEXT NOT NULL REFERENCES teams(id),
   quarter_length_seconds INTEGER NOT NULL DEFAULT 720,
   status TEXT NOT NULL DEFAULT 'pregame',
+  notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -79,4 +80,4 @@ CREATE TABLE IF NOT EXISTS drives (
   result TEXT NOT NULL DEFAULT 'In Progress'
 );
 
-INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.0.1');
+INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.0.2-fixed');

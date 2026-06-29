@@ -69,14 +69,46 @@ export type GameInput = {
   notes?: string | null;
 };
 
-export async function databasePath(): Promise<string> { return invoke('database_path'); }
-export async function listTeams(): Promise<Team[]> { return invoke('list_teams'); }
-export async function saveTeam(input: TeamInput): Promise<Team> { return invoke('save_team', { input }); }
-export async function deleteTeam(id: string): Promise<void> { return invoke('delete_team', { id }); }
-export async function listPlayers(teamId: string): Promise<Player[]> { return invoke('list_players', { teamId }); }
-export async function savePlayer(input: PlayerInput): Promise<Player> { return invoke('save_player', { input }); }
-export async function deletePlayer(id: string): Promise<void> { return invoke('delete_player', { id }); }
-export async function listGames(): Promise<Game[]> { return invoke('list_games'); }
-export async function saveGame(input: GameInput): Promise<Game> { return invoke('save_game', { input }); }
-export async function deleteGame(id: string): Promise<void> { return invoke('delete_game', { id }); }
-export async function createDemoSeed(): Promise<void> { return invoke('create_demo_seed'); }
+export async function databasePath(): Promise<string> {
+  return invoke<string>('database_path');
+}
+
+export async function listTeams(): Promise<Team[]> {
+  return invoke<Team[]>('list_teams');
+}
+
+export async function saveTeam(input: TeamInput): Promise<Team> {
+  return invoke<Team>('save_team', { input });
+}
+
+export async function deleteTeam(id: string): Promise<void> {
+  return invoke<void>('delete_team', { id });
+}
+
+export async function listPlayers(teamId: string): Promise<Player[]> {
+  return invoke<Player[]>('list_players', { teamId });
+}
+
+export async function savePlayer(input: PlayerInput): Promise<Player> {
+  return invoke<Player>('save_player', { input });
+}
+
+export async function deletePlayer(id: string): Promise<void> {
+  return invoke<void>('delete_player', { id });
+}
+
+export async function listGames(): Promise<Game[]> {
+  return invoke<Game[]>('list_games');
+}
+
+export async function saveGame(input: GameInput): Promise<Game> {
+  return invoke<Game>('save_game', { input });
+}
+
+export async function deleteGame(id: string): Promise<void> {
+  return invoke<void>('delete_game', { id });
+}
+
+export async function createDemoSeed(): Promise<void> {
+  return invoke<void>('create_demo_seed');
+}

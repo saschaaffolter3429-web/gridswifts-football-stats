@@ -29,9 +29,14 @@ fn ensure_schema(conn: &Connection) {
         "ALTER TABLE teams ADD COLUMN secondary_color TEXT DEFAULT '#050505'",
         "ALTER TABLE teams ADD COLUMN stadium TEXT",
         "ALTER TABLE teams ADD COLUMN coaches_json TEXT DEFAULT '[]'",
+        "ALTER TABLE games ADD COLUMN notes TEXT",
     ] {
         let _ = conn.execute(sql, []);
     }
+}
+
+fn new_id(prefix: &str) -> String {
+    format!("{}_{}", prefix, chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default())
 }
 
 #[tauri::command]
@@ -86,8 +91,32 @@ struct PlayerInput {
     position: String,
 }
 
-fn new_id(prefix: &str) -> String {
-    format!("{}_{}", prefix, chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default())
+#[derive(Debug, Serialize, Deserialize)]
+struct Game {
+    id: String,
+    game_date: String,
+    location: Option<String>,
+    home_team_id: String,
+    away_team_id: String,
+    home_team_name: String,
+    away_team_name: String,
+    home_abbr: String,
+    away_abbr: String,
+    quarter_length_seconds: i64,
+    status: String,
+    notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GameInput {
+    id: Option<String>,
+    game_date: String,
+    location: Option<String>,
+    home_team_id: String,
+    away_team_id: String,
+    quarter_length_seconds: i64,
+    status: String,
+    notes: Option<String>,
 }
 
 #[tauri::command]
@@ -114,6 +143,30 @@ fn list_teams() -> Result<Vec<Team>, String> {
     }).map_err(|e| e.to_string())?;
 
     rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_team(id: String) -> Result<Team, String> {
+    let conn = open_db();
+    conn.query_row(
+        "SELECT id,name,abbr,location,league,stadium,primary_color,secondary_color,logo_path,coaches_json
+         FROM teams WHERE id=?1",
+        params![id],
+        |row| {
+            Ok(Team {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                abbr: row.get(2)?,
+                location: row.get(3)?,
+                league: row.get(4)?,
+                stadium: row.get(5)?,
+                primary_color: row.get::<_, Option<String>>(6)?.unwrap_or("#ff7a18".to_string()),
+                secondary_color: row.get::<_, Option<String>>(7)?.unwrap_or("#050505".to_string()),
+                logo_path: row.get(8)?,
+                coaches_json: row.get::<_, Option<String>>(9)?.unwrap_or("[]".to_string()),
+            })
+        }
+    ).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -162,30 +215,6 @@ fn save_team(input: TeamInput) -> Result<Team, String> {
     ).map_err(|e| e.to_string())?;
 
     get_team(id)
-}
-
-#[tauri::command]
-fn get_team(id: String) -> Result<Team, String> {
-    let conn = open_db();
-    conn.query_row(
-        "SELECT id,name,abbr,location,league,stadium,primary_color,secondary_color,logo_path,coaches_json
-         FROM teams WHERE id=?1",
-        params![id],
-        |row| {
-            Ok(Team {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                abbr: row.get(2)?,
-                location: row.get(3)?,
-                league: row.get(4)?,
-                stadium: row.get(5)?,
-                primary_color: row.get::<_, Option<String>>(6)?.unwrap_or("#ff7a18".to_string()),
-                secondary_color: row.get::<_, Option<String>>(7)?.unwrap_or("#050505".to_string()),
-                logo_path: row.get(8)?,
-                coaches_json: row.get::<_, Option<String>>(9)?.unwrap_or("[]".to_string()),
-            })
-        }
-    ).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -269,6 +298,115 @@ fn delete_player(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn list_games() -> Result<Vec<Game>, String> {
+    let conn = open_db();
+    let mut stmt = conn.prepare(
+        "SELECT g.id,g.game_date,g.location,g.home_team_id,g.away_team_id,
+                h.name,h.abbr,a.name,a.abbr,g.quarter_length_seconds,g.status,g.notes
+         FROM games g
+         JOIN teams h ON h.id=g.home_team_id
+         JOIN teams a ON a.id=g.away_team_id
+         ORDER BY g.game_date DESC, g.updated_at DESC"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(Game {
+            id: row.get(0)?,
+            game_date: row.get(1)?,
+            location: row.get(2)?,
+            home_team_id: row.get(3)?,
+            away_team_id: row.get(4)?,
+            home_team_name: row.get(5)?,
+            home_abbr: row.get(6)?,
+            away_team_name: row.get(7)?,
+            away_abbr: row.get(8)?,
+            quarter_length_seconds: row.get(9)?,
+            status: row.get(10)?,
+            notes: row.get(11)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_game(id: String) -> Result<Game, String> {
+    let conn = open_db();
+    conn.query_row(
+        "SELECT g.id,g.game_date,g.location,g.home_team_id,g.away_team_id,
+                h.name,h.abbr,a.name,a.abbr,g.quarter_length_seconds,g.status,g.notes
+         FROM games g
+         JOIN teams h ON h.id=g.home_team_id
+         JOIN teams a ON a.id=g.away_team_id
+         WHERE g.id=?1",
+        params![id],
+        |row| {
+            Ok(Game {
+                id: row.get(0)?,
+                game_date: row.get(1)?,
+                location: row.get(2)?,
+                home_team_id: row.get(3)?,
+                away_team_id: row.get(4)?,
+                home_team_name: row.get(5)?,
+                home_abbr: row.get(6)?,
+                away_team_name: row.get(7)?,
+                away_abbr: row.get(8)?,
+                quarter_length_seconds: row.get(9)?,
+                status: row.get(10)?,
+                notes: row.get(11)?,
+            })
+        }
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_game(input: GameInput) -> Result<Game, String> {
+    if input.home_team_id == input.away_team_id {
+        return Err("Heimteam und Auswärtsteam dürfen nicht identisch sein.".to_string());
+    }
+
+    let conn = open_db();
+    let now = chrono::Utc::now().to_rfc3339();
+    let id = input.id.unwrap_or_else(|| new_id("game"));
+
+    conn.execute(
+        "INSERT INTO games(id,game_date,location,home_team_id,away_team_id,quarter_length_seconds,status,notes,created_at,updated_at)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)
+         ON CONFLICT(id) DO UPDATE SET
+           game_date=excluded.game_date,
+           location=excluded.location,
+           home_team_id=excluded.home_team_id,
+           away_team_id=excluded.away_team_id,
+           quarter_length_seconds=excluded.quarter_length_seconds,
+           status=excluded.status,
+           notes=excluded.notes,
+           updated_at=excluded.updated_at",
+        params![
+            id,
+            input.game_date,
+            input.location,
+            input.home_team_id,
+            input.away_team_id,
+            input.quarter_length_seconds,
+            input.status,
+            input.notes,
+            now
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    get_game(id)
+}
+
+#[tauri::command]
+fn delete_game(id: String) -> Result<(), String> {
+    let conn = open_db();
+    conn.execute("DELETE FROM plays WHERE game_id=?1", params![id]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM drives WHERE game_id=?1", params![id]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM games WHERE id=?1", params![id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn create_demo_seed() -> Result<(), String> {
     let conn = open_db();
     let now = chrono::Utc::now().to_rfc3339();
@@ -307,20 +445,6 @@ fn create_demo_seed() -> Result<(), String> {
         ],
     ).map_err(|e| e.to_string())?;
 
-    for p in [
-        ("p_lul_21","team_lul","21","AAA Quarterback","QB"),
-        ("p_lul_22","team_lul","22","BBB Runner","RB"),
-        ("p_lul_23","team_lul","23","CCC Receiver","WR"),
-        ("p_gor_4","team_gor","4","DDD Linebacker","LB"),
-        ("p_gor_5","team_gor","5","EEE Corner","CB"),
-    ] {
-        conn.execute(
-            "INSERT OR IGNORE INTO players(id,team_id,number,name,position,is_active)
-             VALUES(?1,?2,?3,?4,?5,1)",
-            params![p.0,p.1,p.2,p.3,p.4],
-        ).map_err(|e| e.to_string())?;
-    }
-
     Ok(())
 }
 
@@ -338,6 +462,10 @@ pub fn run() {
             list_players,
             save_player,
             delete_player,
+            list_games,
+            get_game,
+            save_game,
+            delete_game,
             create_demo_seed
         ])
         .run(tauri::generate_context!())
