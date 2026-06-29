@@ -11,7 +11,11 @@ CREATE TABLE IF NOT EXISTS teams (
   abbr TEXT NOT NULL,
   location TEXT,
   league TEXT,
+  stadium TEXT,
+  primary_color TEXT DEFAULT '#ff7a18',
+  secondary_color TEXT DEFAULT '#050505',
   logo_path TEXT,
+  coaches_json TEXT DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -75,4 +79,4 @@ CREATE TABLE IF NOT EXISTS drives (
   result TEXT NOT NULL DEFAULT 'In Progress'
 );
 
-INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.0.0');
+INSERT OR REPLACE INTO app_meta(key, value) VALUES ('schema_version', '2.0.1');

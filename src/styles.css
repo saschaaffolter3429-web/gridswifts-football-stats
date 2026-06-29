@@ -4,11 +4,34 @@
 
 body {
   margin: 0;
-  background: #050505;
+  background:
+    radial-gradient(circle at top left, rgba(255,122,24,.18), transparent 30rem),
+    radial-gradient(circle at bottom right, rgba(255,122,24,.10), transparent 28rem),
+    #050505;
   color: white;
   font-family: Inter, system-ui, Segoe UI, sans-serif;
 }
 
-input, select, button {
+input, select, textarea, button {
   font-family: inherit;
+}
+
+.input {
+  width: 100%;
+  margin-top: .45rem;
+  border: 1px solid #303036;
+  background: #09090a;
+  color: white;
+  border-radius: 1rem;
+  padding: .78rem .9rem;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #ff7a18;
+  box-shadow: 0 0 0 3px rgba(255,122,24,.14);
+}
+
+button {
+  cursor: pointer;
 }
