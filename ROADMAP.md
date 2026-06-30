@@ -1,41 +1,98 @@
 # GridSwifts Roadmap
 
-## Release 2
+## Current Focus: Stability
 
-### 2.1.0
-Football Engine Foundation
+Before major new features:
 
-### 2.1.1
-Smart Play Editor
+- stabilize Event Store
+- stabilize Play saving
+- stabilize Timeline
+- stabilize Kickoff calculation
+- add tests
+- remove duplicate logic
 
-### 2.1.2
-Event Sourcing, Undo/Redo, Recalculate
+## 2.1.x – Live Scoring Foundation
+
+### 2.1.5
+Complete Game Input Context
+
+- quarter
+- clock
+- kickoff context
+
+### 2.1.6
+Kickoff Engine
+
+- correct kickoff geometry
+- tests
+- no UI refactor
+
+### 2.1.7
+Kickoff Preview
+
+- simple preview
+- no engine changes
+
+### 2.1.8
+Smart Play Wizard
+
+- guided input
+- keyboard flow
+- no engine changes
+
+### 2.1.9
+Penalty Engine Foundation
+
+- penalty registry
+- penalty inputs
+- basic enforcement
+
+## 2.2.x – Statistics
 
 ### 2.2.0
-ESPN-style Stats System
+Statistics Engine
 
-### 2.3.0
-Broadcast Center
+### 2.2.1
+Team Stats
 
-### 2.4.0
-PDF / Excel / HTML Exports
+### 2.2.2
+Player Stats
 
-## Release 3
+### 2.2.3
+Drive Stats
 
-- Season Management
-- Player Career Stats
-- League Standings
-- Team Pages
+### 2.2.4
+Quality Engine
 
-## Release 4
+## 2.3.x – Reports
 
-- Cloud Sync
-- Multi-user Live Scoring
-- Web GameCenter
-- API
+- ESPN-style Box Score
+- PDF Export
+- Excel Export
+- CSV / JSON
 
-## Release 5
+## 2.4.x – Broadcast
 
-- AI Reports
-- Scout Reports
-- Tendency Analysis
+- Broadcast GameCenter
+- Scorebug
+- Field visualization
+- OBS output
+
+## 2.5.x – Replay
+
+- event replay
+- timeline scrubbing
+- animated field
+
+## 3.0 – Football Operating System
+
+- seasons
+- leagues
+- web dashboard
+- cloud sync
+- multi-user
+- mobile companion
+- AI reports
+- scouting
+- video integration
+
